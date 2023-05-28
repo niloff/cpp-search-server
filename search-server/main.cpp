@@ -67,7 +67,9 @@ vector<string> SplitIntoWords(const string& text) {
     string word;
     for (const char c : text) {
         if(c != ' ') {
-            if(c >= '\0' && c < ' ') throw invalid_argument(ERROR_INCORRECT_CHAR_WITH_CODE + " = '"s + to_string(c) + "'"s);
+            if(c >= '\0' && c < ' ') {
+                throw invalid_argument(ERROR_INCORRECT_CHAR_WITH_CODE + " = '"s + to_string(c) + "'"s);
+            }
             word += c;
             continue;
         }
@@ -159,14 +161,13 @@ public:
                      const vector<int>& ratings) {
         if(document_id < 0 || documents_.count(document_id)) throw invalid_argument(ERROR_DOCUMENT_ID + " = '"s +
                                                                                     to_string(document_id) + "'"s);
-        try {
             const vector<string> words = SplitIntoWordsNoStop(document);
+            document_ids_.push_back(document_id); // добавляем id документа в список добавленных
             const double tf_increment = 1./ words.size();
             for(const string& word: words) {
                 words_measures_[word][document_id] += tf_increment; // здесь наращиваем text frequency
             }
             documents_.emplace(document_id, DocumentData{ComputeAverageRating(ratings), status}); // обновляем количество документов в сервере
-        } catch (const invalid_argument& error) { throw error;}
     }
     /**
      * Найти документы, отсортированные по релевантности запросу
@@ -175,9 +176,7 @@ public:
      */
     template<typename Functor>
     vector<Document> FindTopDocuments(const string& raw_query, Functor functor) const {
-        Query query;
-        try { query = ParseQuery(raw_query); }
-        catch (const invalid_argument& error) { throw error; }
+        const Query query = ParseQuery(raw_query);
         auto matched_documents = FindAllDocuments(query, functor);
         sort(matched_documents.begin(), matched_documents.end(),
              [](const Document& lhs, const Document& rhs) {
@@ -210,8 +209,7 @@ public:
      */
     tuple<vector<string>, DocumentStatus> MatchDocument(const string& raw_query, int document_id) const {
         vector<string> words_matched;
-        Query query_parsed;
-        try { query_parsed = ParseQuery(raw_query); }  catch (const invalid_argument& error) { throw error; }
+        const Query query_parsed = ParseQuery(raw_query);
         for(const string& word : query_parsed.words_plus) {
             if(words_measures_.count(word) == 0 || words_measures_.at(word).count(document_id) == 0) continue;
             words_matched.push_back(word);
@@ -228,11 +226,9 @@ public:
      */
     int GetDocumentId(int index) const  {
         if(index < 0) throw out_of_range(ERROR_DOCUMENT_INDEX + " = '"s + to_string(index) + "'"s);
-        for(const auto& doc : documents_) {
-            if(index <= 0) return doc.first;
-            --index;
-        }
-        throw out_of_range(ERROR_DOCUMENT_INDEX + " = "s + to_string(index) + " > "s + to_string(documents_.size()));
+        if(index > GetDocumentCount())
+            throw out_of_range(ERROR_DOCUMENT_INDEX + " = "s + to_string(index) + " > "s + to_string(GetDocumentCount()));
+        return document_ids_[index];
     }
 private:
     /**
@@ -292,6 +288,10 @@ private:
      */
     map<int, DocumentData> documents_;
     /**
+     * Идентификаторы документов в порядке их добавления
+     */
+    vector<int> document_ids_;
+    /**
      * Является ли слово стоп-словом
      */
     bool IsStopWord(const string& word) const {
@@ -302,21 +302,8 @@ private:
      */
     vector<string> SplitIntoWordsNoStop(const string& text) const {
         vector<string> words;
-        string word;
-        for (const char c : text) {
-            if(c != ' ') {
-                if(c >= '\0' && c < ' ') throw invalid_argument(ERROR_INCORRECT_CHAR_WITH_CODE + " = '"s + to_string(c) + "'"s);
-                word += c;
-                continue;
-            }
-            if (word.empty()) continue;
-            if (!IsStopWord(word)) {
-                words.push_back(word);
-            }
-            word.clear();
-        }
-        // добавляем последнее слово если оно есть и не является стоп-словом
-        if (!word.empty() && !IsStopWord(word)) {
+        for (const string& word : SplitIntoWords(text)) {
+            if (IsStopWord(word)) continue;
             words.push_back(word);
         }
         return words;
@@ -356,7 +343,10 @@ private:
      */
     QueryWord ParseQueryWord(string text) const {
         QueryWord qw({text, (text.front() == '-'), IsStopWord(text)});
-        if(qw.is_minus) qw.text.erase(qw.text.begin());
+        if(!qw.is_minus) return qw;
+        qw.text.erase(qw.text.begin());
+        if(qw.text.empty()) throw invalid_argument(ERROR_MINUS_WORD_EMPTY);
+        if(qw.text.front() == '-') throw invalid_argument(ERROR_MINUS_WORD_EXTRADASH + " '"s + qw.text + "'"s);
         return qw;
     }
     /**
@@ -364,22 +354,18 @@ private:
      */
     Query ParseQuery(const string& text) const {
         Query query;
-        try {
-            for (const string& word : SplitIntoWords(text)) {
-                if(word.empty()) continue;
-                const QueryWord query_word = ParseQueryWord(word);
-                if (query_word.is_stop) continue; // отсеиваем стоп-слова
-                // складываем плюс-слова
-                if (!query_word.is_minus) {
-                    query.words_plus.insert(query_word.text);
-                    continue;
-                }
-                // складываем минус-слова
-                if(query_word.text.empty()) throw invalid_argument(ERROR_MINUS_WORD_EMPTY);
-                if(query_word.text.front() == '-') throw invalid_argument(ERROR_MINUS_WORD_EXTRADASH + " '"s + query_word.text + "'"s);
-                query.words_minus.insert(query_word.text);
+        for (const string& word : SplitIntoWords(text)) {
+            if(word.empty()) continue;
+            const QueryWord query_word = ParseQueryWord(word);
+            if (query_word.is_stop) continue; // отсеиваем стоп-слова
+            // складываем плюс-слова
+            if (!query_word.is_minus) {
+                query.words_plus.insert(query_word.text);
+                continue;
             }
-        }  catch (const invalid_argument& error) { throw error; }
+            // складываем минус-слова
+            query.words_minus.insert(query_word.text);
+        }
         return query;
     }
     /**
@@ -500,7 +486,7 @@ void MatchDocuments(const SearchServer& search_server, const string& query) try 
 } catch (const exception& e) {
     cout << "Произошла ошибка матчинга документов на запрос "s << query << ": "s << e.what() << endl;
 }
-//----- Начало работы программы-----//
+
 int main() {
     SearchServer search_server("и в на"s);
 
