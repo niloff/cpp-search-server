@@ -1,6 +1,7 @@
 #include "string_processing.h"
 #include <algorithm>
 
+using namespace std;
 /**
  * Описание ошибки - недопустимый код символа
  */
@@ -18,24 +19,26 @@ bool StringProcessing::IsNonValidChar(const char ch) {
 /**
  * Проверить символы слова на валидность
  */
-bool StringProcessing::IsValidWord(const std::string& word) {
-    return std::none_of(word.begin(), word.end(), IsNonValidChar);
+bool StringProcessing::IsValidWord(const string& word) {
+    return none_of(word.begin(), word.end(), IsNonValidChar);
 }
 /**
  * Разложить входной текст в вектор из слов
  */
-std::vector<std::string> StringProcessing::SplitIntoWords(const std::string& text) {
-    using namespace std::literals;
-    std::vector<std::string> words;
-    std::string word;
+vector<string> StringProcessing::SplitIntoWords(const string& text) {
+    vector<string> words;
+    string word;
     for (const char c : text) {
-        if(IsNonValidChar(c))
-            throw std::invalid_argument(ERROR_INCORRECT_CHAR_WITH_CODE + " = '"s + std::to_string(c) + "'"s);
+        if(IsNonValidChar(c)) {
+            throw invalid_argument(ERROR_INCORRECT_CHAR_WITH_CODE + " = '"s + to_string(c) + "'"s);
+        }
         if(c != ' ') {
             word += c;
             continue;
         }
-        if (word.empty()) continue;
+        if (word.empty()) {
+            continue;
+        }
         words.push_back(word);
         word.clear();
     }

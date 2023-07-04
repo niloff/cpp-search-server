@@ -13,20 +13,10 @@ public:
     explicit RequestQueue(const SearchServer& search_server) :
         server_(search_server) { }
     /**
-     * Добавить поисковой запрос
+     * Добавить поисковой запрос с предикатом
      */
     template <typename DocumentPredicate>
-    std::vector<Document> AddFindRequest(const std::string& raw_query, DocumentPredicate document_predicate) {
-        const auto response = server_.FindTopDocuments(raw_query, document_predicate);
-        int err_count = GetNoResultRequests();
-        if(requests_.size() >= MINUTES_IN_DAY) {
-            requests_.push_back({response, --err_count});
-            requests_.pop_front();
-            return response;
-        }
-        requests_.push_back({response, err_count});
-        return response;
-    }
+    std::vector<Document> AddFindRequest(const std::string& raw_query, DocumentPredicate document_predicate);
     /**
      * Добавить поисковой запрос
      */
@@ -41,16 +31,10 @@ private:
      * Результат выполнения запроса
      */
     struct QueryResult {
+        QueryResult(const std::vector<Document> docs_result, int errors);
         /**
-         * Конструктор
+         * Счётчик ошибок
          */
-        QueryResult(const std::vector<Document> docs_result, int errors) :
-            total_errors_(errors) {
-            if(docs_result.empty()) {
-                ++total_errors_;
-            }
-        }
-
         int total_errors_ = 0;
     };
     /**
@@ -66,3 +50,18 @@ private:
      */
     const SearchServer& server_;
 };
+/**
+ * Добавить поисковой запрос
+ */
+template <typename DocumentPredicate>
+std::vector<Document> RequestQueue::AddFindRequest(const std::string& raw_query, DocumentPredicate document_predicate) {
+    const auto response = server_.FindTopDocuments(raw_query, document_predicate);
+    int err_count = GetNoResultRequests();
+    if(requests_.size() >= MINUTES_IN_DAY) {
+        requests_.push_back({response, --err_count});
+        requests_.pop_front();
+        return response;
+    }
+    requests_.push_back({response, err_count});
+    return response;
+}

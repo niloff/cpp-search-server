@@ -1,10 +1,8 @@
 #include "document.h"
 #include <math.h>
 #include <numeric>
-/**
- * Допустимая погрешность вычислений при округлении
- */
-const double Document::ERROR_VALUE_EPSILON = 1e-6;
+
+using namespace std;
 /**
  * Описание ошибки - некорректный идентификатор документа
  */
@@ -17,7 +15,7 @@ const char* Document::ERROR_DOCUMENT_INDEX = "Некорректный инде�
  * Оператор сравнения <
  */
 bool Document::operator<(const Document& doc) const {
-    if (std::abs(relevance - doc.relevance) < ERROR_VALUE_EPSILON) {
+    if (abs(relevance - doc.relevance) < numeric_limits<double>::epsilon()) {
         return rating > doc.rating;
     }
     return relevance > doc.relevance;

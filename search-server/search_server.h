@@ -31,8 +31,7 @@ public:
      * Конструктор
      */
     template <typename StringContainer>
-    explicit SearchServer(const StringContainer& stop_words):
-        stop_words_(StringProcessing::ToNonEmptySet(stop_words)) { }
+    explicit SearchServer(const StringContainer& stop_words);
     /**
      * Конструктор
      */
@@ -51,30 +50,18 @@ public:
      * Выводит максимум MAX_RESULT_DOCUMENT_COUNT документов
      */
     template<typename Functor>
-    std::vector<Document> FindTopDocuments(const std::string& raw_query, Functor functor) const {
-        const Query query = ParseQuery(raw_query);
-        auto matched_documents = FindAllDocuments(query, functor);
-        sort(matched_documents.begin(), matched_documents.end());
-        if (matched_documents.size() > MAX_RESULT_DOCUMENT_COUNT) {
-            matched_documents.resize(MAX_RESULT_DOCUMENT_COUNT);
-        }
-        return matched_documents;
-    }
+    std::vector<Document> FindTopDocuments(const std::string& raw_query, Functor functor) const;
     /**
     * Найти документы, отсортированные по релевантности запросу
     * Вариант со статусом документа в качестве параметра
     * Выводит максимум MAX_RESULT_DOCUMENT_COUNT документов
     */
     std::vector<Document> FindTopDocuments(const std::string& raw_query,
-                                           DocumentStatus input_status = DocumentStatus::ACTUAL) const {
-        return FindTopDocuments(raw_query, [input_status](int, DocumentStatus status, int) { return status == input_status; });
-    }
+                                           DocumentStatus input_status = DocumentStatus::ACTUAL) const;
     /**
      * Количество загруженных документов
      */
-    int GetDocumentCount() const {
-        return static_cast<int>(documents_.size());
-    }
+    int GetDocumentCount() const;
     /**
      * Совпадающие слова в запросе к конкретному документу и статус документа
      */
@@ -135,9 +122,7 @@ private:
     /**
      * Является ли слово стоп-словом
      */
-    bool IsStopWord(const std::string& word) const {
-        return stop_words_.count(word) > 0;
-    }
+    bool IsStopWord(const std::string& word) const;
     /**
      * Разложить входной текст в вектор из слов, исключая известные стоп-слова
      */
@@ -164,22 +149,55 @@ private:
      * Для документов также расчитывается TF-IDF
      */
     template<typename Functor>
-    std::vector<Document> FindAllDocuments(const Query& query, Functor functor) const {
-        std::map<int, double> relevances;
-        for (const std::string &word_plus : query.words_plus) {
-            if(words_measures_.count(word_plus) == 0) continue;
-            const double idf = CalcIdf(word_plus);
-            for(const auto [doc_id, tf] : words_measures_.at(word_plus)) {
-                const DocumentData &doc_data = documents_.at(doc_id);
-                if(!functor(doc_id, doc_data.status, doc_data.rating)) continue;
-                relevances[doc_id] += tf * idf;
-            }
-        }
-        std::vector<Document> matched_documents;
-        for (const auto& [doc_id, relevance] : relevances) {
-            if(IsDocHasMinus({doc_id, relevance}, query.words_minus)) continue;
-            matched_documents.push_back({doc_id, relevance, documents_.at(doc_id).rating});
-        }
-        return matched_documents;
-    }
+    std::vector<Document> FindAllDocuments(const Query& query, Functor functor) const;
 };
+/**
+ * Конструктор
+ */
+template <typename StringContainer>
+SearchServer::SearchServer(const StringContainer& stop_words):
+    stop_words_(StringProcessing::ToNonEmptySet(stop_words)) { }
+/**
+ * Найти документы, отсортированные по релевантности запросу
+ * Вариант с функциональным объектом в качестве параметра
+ * Выводит максимум MAX_RESULT_DOCUMENT_COUNT документов
+ */
+template<typename Functor>
+std::vector<Document> SearchServer::FindTopDocuments(const std::string& raw_query, Functor functor) const {
+    const Query query = ParseQuery(raw_query);
+    auto matched_documents = FindAllDocuments(query, functor);
+    sort(matched_documents.begin(), matched_documents.end());
+    if (matched_documents.size() > MAX_RESULT_DOCUMENT_COUNT) {
+        matched_documents.resize(MAX_RESULT_DOCUMENT_COUNT);
+    }
+    return matched_documents;
+}
+/**
+ * Найти все документы, соответствующие запросу
+ * Для документов также расчитывается TF-IDF
+ */
+template<typename Functor>
+std::vector<Document> SearchServer::FindAllDocuments(const Query& query, Functor functor) const {
+    std::map<int, double> relevances;
+    for (const std::string &word_plus : query.words_plus) {
+        if(words_measures_.count(word_plus) == 0) {
+            continue;
+        }
+        const double idf = CalcIdf(word_plus);
+        for(const auto [doc_id, tf] : words_measures_.at(word_plus)) {
+            const DocumentData &doc_data = documents_.at(doc_id);
+            if(!functor(doc_id, doc_data.status, doc_data.rating)) {
+                continue;
+            }
+            relevances[doc_id] += tf * idf;
+        }
+    }
+    std::vector<Document> matched_documents;
+    for (const auto& [doc_id, relevance] : relevances) {
+        if(IsDocHasMinus({doc_id, relevance}, query.words_minus)) {
+            continue;
+        }
+        matched_documents.push_back({doc_id, relevance, documents_.at(doc_id).rating});
+    }
+    return matched_documents;
+}

@@ -2,35 +2,10 @@
 #include <vector>
 #include <ostream>
 /**
- * Cтатус документа
- */
-enum class DocumentStatus {
-    /**
-     * Актуальный
-     */
-    ACTUAL,
-    /**
-     * Не соотвествующий запросу
-     */
-    IRRELEVANT,
-    /**
-     * Исключен
-     */
-    BANNED,
-    /**
-     * Удален
-     */
-    REMOVED,
-};
-/**
  * Документ
  */
 class Document {
 public:
-    /**
-     * Допустимая погрешность вычислений при округлении
-     */
-    static const double ERROR_VALUE_EPSILON;
     /**
      * Описание ошибки - некорректный идентификатор документа
      */
@@ -40,13 +15,7 @@ public:
      */
     static const char* ERROR_DOCUMENT_INDEX;
 public:
-    /**
-     * Конструктор
-     */
     Document() = default;
-    /**
-     * Конструктор
-     */
     Document(int id, double relevance, int rating):
         id(id),
         relevance(relevance),
@@ -55,7 +24,9 @@ public:
      * Оператор сравнения <
      */
     bool operator<(const Document& doc) const;
-
+    /**
+     * Информация о документе в потоке вывода
+     */
     friend std::ostream& operator<<(std::ostream& out, const Document& document) {
         using namespace std;
         out << "{ "s
@@ -78,18 +49,32 @@ private:
      */
     int rating = 0;
 };
-
+/**
+ * Cтатус документа
+ */
+enum class DocumentStatus {
+    /**
+     * Актуальный
+     */
+    ACTUAL,
+    /**
+     * Не соотвествующий запросу
+     */
+    IRRELEVANT,
+    /**
+     * Исключен
+     */
+    BANNED,
+    /**
+     * Удален
+     */
+    REMOVED,
+};
 /**
  * Данные документа
  */
 struct DocumentData {
-    /**
-     * Конструктор
-     */
     DocumentData() = default;
-    /**
-     * Конструктор
-     */
     DocumentData(std::vector<int> ratings, DocumentStatus s) :
         rating(ComputeAverageRating(ratings)),
         status(s) {}

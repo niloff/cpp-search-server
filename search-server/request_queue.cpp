@@ -17,3 +17,12 @@ int RequestQueue::GetNoResultRequests() const {
     if(requests_.empty()) return 0;
     return requests_.back().total_errors_;
 }
+/**
+ * Конструктор
+ */
+RequestQueue::QueryResult::QueryResult(const std::vector<Document> docs_result, int errors) :
+    total_errors_(errors) {
+    if(docs_result.empty()) {
+        ++total_errors_;
+    }
+}

@@ -9,9 +9,6 @@
 template <typename Iterator>
 class IteratorRange {
 public:
-    /**
-     * Конструктор
-     */
     IteratorRange(Iterator begin, Iterator end) :
         begin_(begin),
         end_(end),
@@ -40,7 +37,6 @@ public:
     size_t size() const {
         return page_size_;
     }
-
 private:
     /**
      * Указатель на первый документ
@@ -61,15 +57,14 @@ private:
 template <typename Iterator>
 class Paginator {
 public:
-    /**
-     * Конструктор
-     */
     Paginator(Iterator begin, Iterator end, size_t page_size) {
         while(begin + page_size <= end) {
             pages.push_back(IteratorRange<Iterator>({begin, begin + page_size}));
             advance(begin, page_size);
         }
-        if(begin != end) pages.push_back(IteratorRange<Iterator>({begin, end}));
+        if(begin != end) {
+            pages.push_back(IteratorRange<Iterator>({begin, end}));
+        }
     }
     /**
      * Указатель на первую страницу

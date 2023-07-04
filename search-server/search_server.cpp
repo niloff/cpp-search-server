@@ -14,11 +14,12 @@ const char* SearchServer::ERROR_MINUS_WORD_EXTRADASH = "Минус-слово с
  * Добавить новый документ с id, содержимым, статусом и оценками рейтинга
  */
 void SearchServer::AddDocument(int document_id,
-                 const std::string& document,
-                 DocumentStatus status,
-                 const std::vector<int>& ratings) {
-    if(document_id < 0 || documents_.count(document_id))
+                               const std::string& document,
+                               DocumentStatus status,
+                               const std::vector<int>& ratings) {
+    if(document_id < 0 || documents_.count(document_id)) {
         throw invalid_argument(Document::ERROR_DOCUMENT_ID + " = '"s + to_string(document_id) + "'"s);
+    }
     const vector<string> words = SplitIntoWordsNoStop(document);
     document_ids_.push_back(document_id); // добавляем id документа в список добавленных
     const double tf_increment = 1./ words.size();
@@ -28,6 +29,21 @@ void SearchServer::AddDocument(int document_id,
     documents_.emplace(document_id, DocumentData{ratings, status}); // обновляем количество документов в сервере
 }
 /**
+* Найти документы, отсортированные по релевантности запросу
+* Вариант со статусом документа в качестве параметра
+* Выводит максимум MAX_RESULT_DOCUMENT_COUNT документов
+*/
+std::vector<Document> SearchServer::FindTopDocuments(const std::string& raw_query,
+                                                     DocumentStatus input_status) const {
+    return FindTopDocuments(raw_query, [input_status](int, DocumentStatus status, int) { return status == input_status; });
+}
+/**
+ * Количество загруженных документов
+ */
+int SearchServer::GetDocumentCount() const {
+    return static_cast<int>(documents_.size());
+}
+/**
  * Совпадающие слова в запросе к конкретному документу и статус документа
  */
 std::tuple<std::vector<std::string>, DocumentStatus> SearchServer::MatchDocument(const std::string& raw_query,
@@ -35,11 +51,17 @@ std::tuple<std::vector<std::string>, DocumentStatus> SearchServer::MatchDocument
     vector<string> words_matched;
     const Query query_parsed = ParseQuery(raw_query);
     for(const string& word : query_parsed.words_plus) {
-        if(words_measures_.count(word) == 0 || words_measures_.at(word).count(document_id) == 0) continue;
+        if(words_measures_.count(word) == 0 ||
+           words_measures_.at(word).count(document_id) == 0) {
+            continue;
+        }
         words_matched.push_back(word);
     }
     for(const string& word : query_parsed.words_minus) {
-        if(words_measures_.count(word) == 0 || words_measures_.at(word).count(document_id) == 0) continue;
+        if(words_measures_.count(word) == 0 ||
+           words_measures_.at(word).count(document_id) == 0) {
+            continue;
+        }
         words_matched.clear();
         break;
     }
@@ -49,10 +71,21 @@ std::tuple<std::vector<std::string>, DocumentStatus> SearchServer::MatchDocument
  * Идентификатор документа по его порядковому индексу
  */
 int SearchServer::GetDocumentId(int index) const  {
-    if(index < 0) throw out_of_range(Document::ERROR_DOCUMENT_INDEX + " = '"s + to_string(index) + "'"s);
-    if(index > GetDocumentCount())
-        throw out_of_range(Document::ERROR_DOCUMENT_INDEX + " = "s + to_string(index) + " > "s + to_string(GetDocumentCount()));
+    if(index < 0) {
+        throw out_of_range(Document::ERROR_DOCUMENT_INDEX + " = '"s
+                           + to_string(index) + "'"s);
+    }
+    if(index > GetDocumentCount()) {
+        throw out_of_range(Document::ERROR_DOCUMENT_INDEX + " = "s
+                           + to_string(index) + " > "s + to_string(GetDocumentCount()));
+    }
     return document_ids_[index];
+}
+/**
+ * Является ли слово стоп-словом
+ */
+bool SearchServer::IsStopWord(const std::string& word) const {
+    return stop_words_.count(word) > 0;
 }
 /**
  * Разложить входной текст в вектор из слов, исключая известные стоп-слова
@@ -60,7 +93,9 @@ int SearchServer::GetDocumentId(int index) const  {
 std::vector<std::string> SearchServer::SplitIntoWordsNoStop(const std::string& text) const {
     std::vector<std::string> words;
     for (const string& word : StringProcessing::SplitIntoWords(text)) {
-        if (IsStopWord(word)) continue;
+        if (IsStopWord(word)) {
+            continue;
+        }
         words.push_back(word);
     }
     return words;
@@ -72,8 +107,12 @@ SearchServer::QueryWord SearchServer::ParseQueryWord(string text) const {
     QueryWord qw({text, (text.front() == '-'), IsStopWord(text)});
     if(!qw.is_minus) return qw;
     qw.text.erase(qw.text.begin());
-    if(qw.text.empty()) throw invalid_argument(ERROR_MINUS_WORD_EMPTY);
-    if(qw.text.front() == '-') throw invalid_argument(ERROR_MINUS_WORD_EXTRADASH + " '"s + qw.text + "'"s);
+    if(qw.text.empty()) {
+        throw invalid_argument(ERROR_MINUS_WORD_EMPTY);
+    }
+    if(qw.text.front() == '-') {
+        throw invalid_argument(ERROR_MINUS_WORD_EXTRADASH + " '"s + qw.text + "'"s);
+    }
     return qw;
 }
 /**
@@ -82,9 +121,13 @@ SearchServer::QueryWord SearchServer::ParseQueryWord(string text) const {
 SearchServer::Query SearchServer::ParseQuery(const std::string& text) const {
     Query query;
     for (const std::string& word : StringProcessing::SplitIntoWords(text)) {
-        if(word.empty()) continue;
+        if(word.empty()) {
+            continue;
+        }
         const QueryWord query_word = ParseQueryWord(word);
-        if (query_word.is_stop) continue; // отсеиваем стоп-слова
+        if (query_word.is_stop) {
+            continue; // отсеиваем стоп-слова
+        }
         // складываем плюс-слова
         if (!query_word.is_minus) {
             query.words_plus.insert(query_word.text);
@@ -108,9 +151,13 @@ double SearchServer::CalcIdf(const std::string& word) const {
 bool SearchServer::IsDocHasMinus(const std::pair<int, double>& doc,
                                  const std::set<std::string> &words_minus) const {
     for (const string &word : words_minus) {
-        if(words_measures_.count(word) == 0) continue;
+        if(words_measures_.count(word) == 0) {
+            continue;
+        }
         for (const auto& measures : words_measures_.at(word)) {
-            if(doc.first != measures.first) continue;
+            if(doc.first != measures.first) {
+                continue;
+            }
             return true;
         }
     }

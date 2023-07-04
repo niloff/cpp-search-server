@@ -1,0 +1,1 @@
+/usr/bin/clang++-14 -g CMakeFiles/search-server.dir/document.cpp.o CMakeFiles/search-server.dir/main.cpp.o CMakeFiles/search-server.dir/read_input_functions.cpp.o CMakeFiles/search-server.dir/request_queue.cpp.o CMakeFiles/search-server.dir/search_server.cpp.o CMakeFiles/search-server.dir/string_processing.cpp.o -o search-server 
