@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <iostream>
 /**
  * Функции для чтения ввода из консоли
  */

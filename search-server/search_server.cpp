@@ -11,6 +11,22 @@ const char* SearchServer::ERROR_MINUS_WORD_EMPTY = "В запросе содер
  */
 const char* SearchServer::ERROR_MINUS_WORD_EXTRADASH = "Минус-слово содержит лишнее тире";
 /**
+ * Пустой контейнер слов и text frequency
+ */
+const std::map<std::string, double> SearchServer::EMPTY_DOC_MEASURES = {};
+/**
+ * Начальный итератор загруженных id документов
+ */
+const std::set<int>::const_iterator SearchServer::begin() const noexcept {
+    return document_ids_.begin();
+}
+/**
+ * Конечный итератор загруженных id документов
+ */
+const std::set<int>::const_iterator SearchServer::end() const noexcept {
+    return document_ids_.end();
+}
+/**
  * Добавить новый документ с id, содержимым, статусом и оценками рейтинга
  */
 void SearchServer::AddDocument(int document_id,
@@ -21,12 +37,13 @@ void SearchServer::AddDocument(int document_id,
         throw invalid_argument(Document::ERROR_DOCUMENT_ID + " = '"s + to_string(document_id) + "'"s);
     }
     const vector<string> words = SplitIntoWordsNoStop(document);
-    document_ids_.push_back(document_id); // добавляем id документа в список добавленных
     const double tf_increment = 1./ words.size();
     for(const string& word: words) {
         words_measures_[word][document_id] += tf_increment; // здесь наращиваем text frequency
+        document_measures_[document_id][word] += tf_increment;
     }
     documents_.emplace(document_id, DocumentData{ratings, status}); // обновляем количество документов в сервере
+    document_ids_.emplace(document_id); // добавляем id документа в список добавленных
 }
 /**
 * Найти документы, отсортированные по релевантности запросу
@@ -68,18 +85,40 @@ std::tuple<std::vector<std::string>, DocumentStatus> SearchServer::MatchDocument
     return {words_matched, documents_.at(document_id).status};
 }
 /**
- * Идентификатор документа по его порядковому индексу
+ * Получить text frequency слов по id документа
  */
-int SearchServer::GetDocumentId(int index) const  {
-    if(index < 0) {
-        throw out_of_range(Document::ERROR_DOCUMENT_INDEX + " = '"s
-                           + to_string(index) + "'"s);
+const std::map<std::string, double>& SearchServer::GetWordFrequencies(int document_id) const {
+    if(document_measures_.count(document_id) == 0) return EMPTY_DOC_MEASURES;
+    return document_measures_.at(document_id);
+}
+/**
+ * Получить уникальные слова документа
+ */
+const std::vector<std::string> SearchServer::GetUniqueWords(int document_id) const {
+    const auto &words_tf = GetWordFrequencies(document_id);
+    vector<string> words;
+    words.reserve(words_tf.size());
+    transform(words_tf.begin(), words_tf.end(), back_inserter(words), [](const pair<string, double>& v) {
+        return v.first;
+    });
+    return words;
+}
+/**
+ * Удалить документ по его id
+ */
+void SearchServer::RemoveDocument(int document_id) {
+    if(documents_.count(document_id) == 0 &&
+       document_ids_.count(document_id) == 0 &&
+       document_measures_.count(document_id) == 0) return;
+    // вычищаем измерения документа в словаре
+    const auto &doc_measure = document_measures_.at(document_id);
+    for(auto &[word, tf] : doc_measure) {
+        words_measures_.at(word).erase(document_id);
     }
-    if(index > GetDocumentCount()) {
-        throw out_of_range(Document::ERROR_DOCUMENT_INDEX + " = "s
-                           + to_string(index) + " > "s + to_string(GetDocumentCount()));
-    }
-    return document_ids_[index];
+    // вычищаем данные о документе в остальных переменных
+    documents_.erase(document_id);
+    document_ids_.erase(document_id);
+    document_measures_.erase(document_id);
 }
 /**
  * Является ли слово стоп-словом

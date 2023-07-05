@@ -27,6 +27,12 @@ public:
      * Описание ошибки - минус-слово содержит лишнее тире
      */
     static const char* ERROR_MINUS_WORD_EXTRADASH;
+private:
+    /**
+     * Пустой контейнер слов и text frequency
+     */
+    static const std::map<std::string, double> EMPTY_DOC_MEASURES;
+public:
     /**
      * Конструктор
      */
@@ -37,6 +43,14 @@ public:
      */
     explicit SearchServer(const std::string& stop_words_text):
         SearchServer(StringProcessing::SplitIntoWords(stop_words_text)) { }
+    /**
+     * Начальный итератор загруженных id документов
+     */
+    const std::set<int>::const_iterator begin() const noexcept;
+    /**
+     * Конечный итератор загруженных id документов
+     */
+    const std::set<int>::const_iterator end() const noexcept;
     /**
      * Добавить новый документ с id, содержимым, статусом и оценками рейтинга
      */
@@ -68,9 +82,17 @@ public:
     std::tuple<std::vector<std::string>, DocumentStatus> MatchDocument(const std::string& raw_query,
                                                                        int document_id) const;
     /**
-     * Идентификатор документа по его порядковому индексу
+     * Получить text frequency слов по id документа
      */
-    int GetDocumentId(int index) const;
+    const std::map<std::string, double>& GetWordFrequencies(int document_id) const;
+    /**
+     * Получить уникальные слова документа
+     */
+    const std::vector<std::string> GetUniqueWords(int document_id) const;
+    /**
+     * Удалить документ по его id
+     */
+    void RemoveDocument(int document_id);
 private:
     /**
      * Слово из запроса
@@ -108,6 +130,11 @@ private:
      */
     std::map<std::string, std::map<int, double>> words_measures_;
     /**
+     * Измерения для загруженных документов
+     * По id документа содержит слова и их text frequency
+     */
+    std::map<int, std::map<std::string, double>> document_measures_;
+    /**
      * Известные стоп-слова
      */
     std::set<std::string> stop_words_;
@@ -116,9 +143,9 @@ private:
      */
     std::map<int, DocumentData> documents_;
     /**
-     * Идентификаторы документов в порядке их добавления
+     * Идентификаторы добавленных документов
      */
-    std::vector<int> document_ids_;
+    std::set<int> document_ids_;
     /**
      * Является ли слово стоп-словом
      */
