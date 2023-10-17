@@ -13,5 +13,6 @@ FILE(GLOB_RECURSE CPP "*.cpp")
 FILE(GLOB_RECURSE H "*.h")
 
 add_executable(${PROJECT_NAME} ${CPP} ${H})
+target_link_libraries(${PROJECT_NAME} tbb pthread)
 
 install(TARGETS ${PROJECT_NAME} DESTINATION bin)
