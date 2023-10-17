@@ -51,12 +51,12 @@ void PrintDocument(const Document& document) {
 /**
  * Вывод параметров документа и найденных по запросу слов в консоль
  */
-void PrintMatchDocumentResult(int document_id, const std::vector<std::string>& words, DocumentStatus status) {
+void PrintMatchDocumentResult(int document_id, const std::vector<string_view> &words, DocumentStatus status) {
     std::cout << "{ "s
         << "document_id = "s << document_id << ", "s
         << "status = "s << static_cast<int>(status) << ", "s
         << "words ="s;
-    for (const std::string& word : words) {
+    for (const auto& word : words) {
         std::cout << ' ' << word;
     }
     std::cout << "}"s << std::endl;

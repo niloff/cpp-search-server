@@ -20,4 +20,4 @@ void PrintDocument(const Document& document);
 /**
  * Вывод параметров документа и найденных по запросу слов в консоль
  */
-void PrintMatchDocumentResult(int document_id, const std::vector<std::string>& words, DocumentStatus status);
+void PrintMatchDocumentResult(int document_id, const std::vector<std::string_view>& words, DocumentStatus status);

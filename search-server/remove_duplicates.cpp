@@ -6,7 +6,7 @@ using namespace std;
  * Поиск и удаление дубликатов на сервере
  */
 void RemoveDuplicates(SearchServer &search_server) {
-    set<vector<string>> words_known;
+    set<vector<string_view>> words_known;
     set<int> ids_duplicate;
     for (const int document_id : search_server) {
         const auto &words_doc = search_server.GetUniqueWords(document_id);

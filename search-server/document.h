@@ -11,7 +11,7 @@ public:
      */
     static const char* ERROR_DOCUMENT_ID;
     /**
-     * Описание ошибки - некорректный идентификатор документа
+     * Описание ошибки - некорректный индекс документа
      */
     static const char* ERROR_DOCUMENT_INDEX;
 public:
@@ -35,7 +35,6 @@ public:
             << "rating = "s << document.rating << " }"s;
         return out;
     }
-private:
     /**
      * Идентификатор
      */
