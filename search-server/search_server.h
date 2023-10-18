@@ -15,10 +15,6 @@
 class SearchServer {
 public:
     /**
-     * Значение идентификатора если документ отсуствует
-     */
-    inline static constexpr int INVALID_DOCUMENT_ID = -1;
-    /**
      * Максимальное число документов в выдаче
      */
     static const int MAX_RESULT_DOCUMENT_COUNT = 5;
@@ -36,19 +32,13 @@ private:
      */
     static const std::map<std::string_view, double> EMPTY_DOC_MEASURES;
 public:
-    /**
-     * Конструктор
-     */
+
     template <typename StringContainer>
     explicit SearchServer(const StringContainer& stop_words);
-    /**
-     * Конструктор
-     */
+
     explicit SearchServer(const std::string& stop_words_text):
         SearchServer(StringProcessing::SplitIntoWordsView(stop_words_text)) { }
-    /**
-     * Конструктор
-     */
+
     explicit SearchServer(std::string_view stop_words_text):
         SearchServer(StringProcessing::SplitIntoWordsView(stop_words_text)) { }
     /**
@@ -212,13 +202,9 @@ private:
     QueryWord ParseQueryWord(std::string_view text) const;
     /**
      * Получить структурированный запрос из текста
+     * Указываем нужно ли удаление повторяющихся слов
      */
-    Query ParseQuery(std::string_view text) const;
-    /**
-     * Получить структурированный запрос из текста.
-     * Реализация под многопоточность
-     */
-    Query ParseQueryParallel(std::string_view text) const;
+    Query ParseQuery(std::string_view text, bool need_unique = false) const;
     /**
      * Вычислить IDF для слова
      */
@@ -242,18 +228,11 @@ private:
     template<typename ExecutionPolicy, typename Functor>
     std::vector<Document> FindAllDocuments(ExecutionPolicy policy, const Query& query, Functor functor) const;
 };
-/**
- * Конструктор
- */
+
 template <typename StringContainer>
 SearchServer::SearchServer(const StringContainer& stop_words):
     stop_words_(StringProcessing::ToNonEmptySet(stop_words)) { }
-/**
- * Найти документы, отсортированные по релевантности запросу
- * Вариант с политикой исполения поиска (однопоточная/многопоточная) и
- * функциональным объектом в качестве параметра
- * Выводит максимум MAX_RESULT_DOCUMENT_COUNT документов
- */
+
 template<typename ExecutionPolicy, typename Functor>
 std::vector<Document> SearchServer::FindTopDocuments(ExecutionPolicy policy, std::string_view raw_query, Functor functor) const {
     const Query& query = ParseQuery(raw_query);
@@ -264,21 +243,12 @@ std::vector<Document> SearchServer::FindTopDocuments(ExecutionPolicy policy, std
     }
     return matched_documents;
 }
-/**
- * Найти документы, отсортированные по релевантности запросу
- * Вариант с функциональным объектом в качестве параметра
- * Выводит максимум MAX_RESULT_DOCUMENT_COUNT документов
- */
+
 template <typename Functor>
 std::vector<Document> SearchServer::FindTopDocuments(std::string_view raw_query, Functor functor) const {
     return FindTopDocuments(std::execution::seq, raw_query, functor);
 }
-/**
- * Найти документы, отсортированные по релевантности запросу
- * Вариант с политикой исполения поиска в качестве параметра и
- * статуса документа
- * Выводит максимум MAX_RESULT_DOCUMENT_COUNT документов
- */
+
 template<typename ExecutionPolicy>
 std::vector<Document> SearchServer::FindTopDocuments(ExecutionPolicy policy,
                                        std::string_view raw_query,
@@ -289,10 +259,7 @@ std::vector<Document> SearchServer::FindTopDocuments(ExecutionPolicy policy,
         return status == input_status;
     });
 }
-/**
- * Найти все документы, соответствующие запросу
- * Для документов также расчитывается TF-IDF
- */
+
 template<typename Functor>
 std::vector<Document> SearchServer::FindAllDocuments(const Query& query, Functor functor) const {
     std::map<int, double> relevances;
@@ -317,11 +284,7 @@ std::vector<Document> SearchServer::FindAllDocuments(const Query& query, Functor
     }
     return matched_documents;
 }
-/**
- * Найти все документы, соответствующие запросу
- * Многопоточная реализация
- * Для документов также расчитывается TF-IDF
- */
+
 template<typename ExecutionPolicy, typename Functor>
 std::vector<Document> SearchServer::FindAllDocuments(ExecutionPolicy policy, const Query& query, Functor functor) const {
     using namespace std::execution;

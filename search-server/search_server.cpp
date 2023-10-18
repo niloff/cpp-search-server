@@ -69,7 +69,7 @@ std::tuple<std::vector<std::string_view>, DocumentStatus> SearchServer::MatchDoc
         throw out_of_range(Document::ERROR_DOCUMENT_INDEX + " = '"s + to_string(document_id) + "'"s);
     }
     vector<string_view> words_matched;
-    const Query& query_parsed = ParseQuery(raw_query);
+    const Query& query_parsed = ParseQuery(raw_query, true);
     // проверяем на наличие минус-слов в документе
     for(const string_view word : query_parsed.words_minus) {
         if(words_measures_.count(std::string(word)) == 0 ||
@@ -108,7 +108,7 @@ std::tuple<std::vector<std::string_view>, DocumentStatus> SearchServer::MatchDoc
     if(document_id < 0 || documents_.count(document_id) == 0) {
         throw out_of_range(Document::ERROR_DOCUMENT_INDEX + " = '"s + to_string(document_id) + "'"s);
     }
-    const Query& query_parsed = ParseQueryParallel(raw_query);
+    const Query& query_parsed = ParseQuery(raw_query);
     const auto& doc_measures = document_measures_.at(document_id);
     vector<string_view> words_matched;
     // проверяем на наличие минус-слов в документе
@@ -118,7 +118,7 @@ std::tuple<std::vector<std::string_view>, DocumentStatus> SearchServer::MatchDoc
                [&doc_measures](const auto word) {
                return doc_measures.count(word);
     })) {
-        return { words_matched, documents_.at(document_id).status};
+        return {words_matched, documents_.at(document_id).status};
     }
     // добавляем совпавшие с запросом плюс слова
     words_matched.reserve(query_parsed.words_plus.size());
@@ -238,8 +238,9 @@ SearchServer::QueryWord SearchServer::ParseQueryWord(string_view text) const {
 }
 /**
  * Получить структурированный запрос из текста
+ * Указываем нужно ли удаление повторяющихся слов
  */
-SearchServer::Query SearchServer::ParseQuery(std::string_view text) const {
+SearchServer::Query SearchServer::ParseQuery(std::string_view text,  bool need_unique) const {
     Query query;
     for (const auto word : StringProcessing::SplitIntoWordsView(text)) {
         const QueryWord& query_word = ParseQueryWord(word);
@@ -253,40 +254,21 @@ SearchServer::Query SearchServer::ParseQuery(std::string_view text) const {
         }
         // складываем минус-слова
         query.words_minus.push_back(query_word.text);
+    }
+    // если не нужно удалять повторяющиеся элементы - возвращаем результат
+    if(!need_unique) {
+        return query;
     }
     // сортируем
     sort(query.words_minus.begin(), query.words_minus.end());
     sort(query.words_plus.begin(), query.words_plus.end());
     // убираем повторившиеся слова
-    auto last_minus = unique(query.words_minus.begin(), query.words_minus.end());
-    auto last_plus = unique(query.words_plus.begin(), query.words_plus.end());
+    const auto last_minus = unique(query.words_minus.begin(), query.words_minus.end());
+    const auto last_plus = unique(query.words_plus.begin(), query.words_plus.end());
     // для минус слов
-    size_t unique_size = last_minus - query.words_minus.begin();
-    query.words_minus.resize(unique_size);
+    query.words_minus.erase(last_minus, query.words_minus.end());
     // для плюс слов
-    unique_size = last_plus - query.words_plus.begin();
-    query.words_plus.resize(unique_size);
-    return query;
-}
-/**
- * Получить структурированный запрос из текста.
- * Реализация под многопоточность
- */
-SearchServer::Query SearchServer::ParseQueryParallel(std::string_view text) const {
-    Query query;
-    for (const auto word : StringProcessing::SplitIntoWordsView(text)) {
-        const QueryWord& query_word = ParseQueryWord(word);
-        if (query_word.is_stop) {
-            continue; // отсеиваем стоп-слова
-        }
-        // складываем плюс-слова
-        if (!query_word.is_minus) {
-            query.words_plus.push_back(query_word.text);
-            continue;
-        }
-        // складываем минус-слова
-        query.words_minus.push_back(query_word.text);
-    }
+    query.words_plus.erase(last_plus, query.words_plus.end());
     return query;
 }
 /**
